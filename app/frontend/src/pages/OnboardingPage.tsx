@@ -5,289 +5,161 @@ export default function OnboardingPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Day 1: Onboarding</h1>
+      <h1 className="page-title">Stage 2: Onboarding</h1>
       <p className="page-subtitle">
-        Every agent follows the same 3-step onboarding process — identity,
-        access, and audit. No shortcuts, no exceptions.
+        Every agent follows a structured onboarding flow — orientation, sandbox access,
+        and a probation period with stricter guardrails. No shortcuts, no exceptions.
       </p>
 
-      {/* ── Context: Why this matters ── */}
       <div className="callout-box" style={{ marginTop: 32 }}>
         <div className="callout-icon">🏢</div>
         <div>
-          <strong>The HR analogy:</strong> When a new employee joins, HR doesn't hand them
-          the keys to every system. They get an identity (SSO), role-based access (only what
-          their job requires), and everything they do is logged (compliance). AI agents
-          deserve the exact same treatment.
+          <strong>The HR analogy:</strong> New employees don't get admin access on Day 1. They get
+          orientation, a limited sandbox, and a probation period where their manager reviews their
+          work more closely. Agent onboarding works the same way.
         </div>
       </div>
 
-      {/* ── Progress Bar ── */}
-      <div className="onboarding-progress" style={{ marginTop: 40 }}>
-        <div className="progress-track">
-          <div className="progress-step active">
-            <div className="progress-dot">🪪</div>
-            <span>Identity</span>
-          </div>
-          <div className="progress-connector" />
-          <div className="progress-step active">
-            <div className="progress-dot">🔑</div>
-            <span>Access</span>
-          </div>
-          <div className="progress-connector" />
-          <div className="progress-step active">
-            <div className="progress-dot">📋</div>
-            <span>Audit</span>
-          </div>
-        </div>
+      {/* ── Onboarding Checklist ── */}
+      <div className="divider-section" style={{ marginTop: 40 }}>
+        <div className="divider-line" />
+        <span className="divider-label">THE ONBOARDING CHECKLIST</span>
+        <div className="divider-line" />
       </div>
 
-      <div className="flow-steps" style={{ marginTop: 40 }}>
-        {/* ══ Step 1: Identity ══ */}
-        <div className="flow-step">
-          <div className="step-marker">
-            <div className="step-number">1</div>
-            <div className="step-label">Identity</div>
-          </div>
-          <div className="step-content">
-            <h3>Create a Service Principal</h3>
-            <p>
-              Just like a new employee gets an SSO account, each agent gets a
-              <strong> service principal</strong> in Unity Catalog. This is their
-              identity — unique, auditable, and revocable.
-            </p>
-
-            <div className="step-detail-grid">
-              <div className="step-detail-item">
-                <span className="step-detail-label">Human equivalent</span>
-                <span className="step-detail-value">Employee SSO account</span>
-              </div>
-              <div className="step-detail-item">
-                <span className="step-detail-label">UC mechanism</span>
-                <span className="step-detail-value">Service Principal</span>
-              </div>
-              <div className="step-detail-item">
-                <span className="step-detail-label">Key property</span>
-                <span className="step-detail-value">Unique, revocable, auditable</span>
-              </div>
+      <div className="onboarding-checklist">
+        {[
+          {
+            step: "1", title: "Identity Verification",
+            desc: "Service principal created, added to department group, linked to requisition record",
+            sql: "-- Verified: SP exists in Unity Catalog\nSELECT * FROM system.access.service_principals\nWHERE display_name = 'agent-health-monitor';",
+            uc: "Service Principal → Group membership → Requisition FK",
+          },
+          {
+            step: "2", title: "Sandbox Assignment",
+            desc: "Agent gets read-only access to a sandbox schema with sample data — NOT production tables",
+            sql: "-- Sandbox grants: read sample data only\nGRANT SELECT ON SCHEMA sandbox.bop_samples\n  TO `agent-health-monitor`;\n\n-- Production access is DENIED during onboarding\nDENY SELECT ON SCHEMA sensors.bronze\n  TO `agent-health-monitor`;",
+            uc: "GRANT on sandbox schema → DENY on production schemas",
+          },
+          {
+            step: "3", title: "Model Access (Staging Only)",
+            desc: "Agent can only call Staging versions of models in MLflow — not Production models",
+            sql: "-- MLflow Registry: agent can only load Staging models\n-- Enforced via UC function permissions\nGRANT EXECUTE ON FUNCTION ml.tools.detect_anomaly_staging\n  TO `agent-health-monitor`;\n\n-- Production version is off-limits\nDENY EXECUTE ON FUNCTION ml.tools.detect_anomaly_prod\n  TO `agent-health-monitor`;",
+            uc: "EXECUTE on staging functions → DENY on production functions",
+          },
+          {
+            step: "4", title: "Compute Assignment",
+            desc: "Agent is assigned to a restrictive cluster policy — small instance, auto-terminate, no spot override",
+            sql: "-- Cluster policy: onboarding_agents\n-- Max workers: 2, auto-terminate: 30min\n-- Instance type: locked to i3.xlarge\n-- No access to GPU clusters",
+            uc: "Cluster policy → onboarding_agents (restrictive)",
+          },
+          {
+            step: "5", title: "Probation Mode Activated",
+            desc: "Agent actions require human approval for the first 30 days. Every output goes through a review queue.",
+            sql: "-- Probation config in agent registry\nUPDATE hr.agents\nSET lifecycle_stage = 'probation',\n    probation_end_date = current_date() + INTERVAL 30 DAYS\nWHERE agent_id = 'agent_001';",
+            uc: "lifecycle_stage = 'probation' → human-in-the-loop required",
+          },
+        ].map((item) => (
+          <div key={item.step} className="checklist-item">
+            <div className="checklist-marker">
+              <div className="checklist-num">{item.step}</div>
             </div>
-
-            <div className="code-block">
-              <span className="cm">-- Create identity for the HEALTH agent</span><br />
-              <span className="kw">CREATE</span> <span className="fn">SERVICE PRINCIPAL</span>{" "}
-              <span className="str">'agent-health-monitor'</span><br />
-              &nbsp;&nbsp;<span className="kw">COMMENT</span>{" "}
-              <span className="str">'BOP Health monitoring agent — reads sensor telemetry'</span>;
-              <br /><br />
-              <span className="cm">-- Same for every agent in the fleet</span><br />
-              <span className="kw">CREATE</span> <span className="fn">SERVICE PRINCIPAL</span>{" "}
-              <span className="str">'agent-maintenance-planner'</span>;
-              <br />
-              <span className="kw">CREATE</span> <span className="fn">SERVICE PRINCIPAL</span>{" "}
-              <span className="str">'agent-supply-chain'</span>;
-              <br />
-              <span className="kw">CREATE</span> <span className="fn">SERVICE PRINCIPAL</span>{" "}
-              <span className="str">'agent-crew-supervisor'</span>;
-              <br />
-              <span className="kw">CREATE</span> <span className="fn">SERVICE PRINCIPAL</span>{" "}
-              <span className="str">'agent-drilling-ops'</span>;
-            </div>
-
-            <div className="callout-box" style={{ marginTop: 16, background: "rgba(16,185,129,0.06)", borderColor: "rgba(16,185,129,0.2)" }}>
-              <div className="callout-icon">✅</div>
-              <div style={{ fontSize: 13 }}>
-                <strong>Result:</strong> Each agent now has a distinct identity in Unity Catalog.
-                Every action they take will be attributed to this specific principal —
-                no more shared service accounts where you can't tell which agent did what.
+            <div className="checklist-content">
+              <h3>{item.title}</h3>
+              <p>{item.desc}</p>
+              <div className="code-block" style={{ marginTop: 12 }}>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{item.sql}</pre>
+              </div>
+              <div className="uc-badge">
+                <span className="uc-icon">🔐</span> {item.uc}
               </div>
             </div>
           </div>
-        </div>
-
-        {/* ── Transition ── */}
-        <div className="step-transition">
-          <span>Identity established. Now — what can this agent actually access?</span>
-        </div>
-
-        {/* ══ Step 2: Access ══ */}
-        <div className="flow-step">
-          <div className="step-marker">
-            <div className="step-number">2</div>
-            <div className="step-label">Access</div>
-          </div>
-          <div className="step-content">
-            <h3>Grant Role-Based Permissions</h3>
-            <p>
-              Each agent gets <strong>only the data they need</strong> — nothing
-              more. Unity Catalog grants work at table, column, and row level.
-              The HEALTH agent can read sensor telemetry but never sees crew
-              schedules or cost data.
-            </p>
-
-            <div className="step-detail-grid">
-              <div className="step-detail-item">
-                <span className="step-detail-label">Human equivalent</span>
-                <span className="step-detail-value">Role-based access (RBAC)</span>
-              </div>
-              <div className="step-detail-item">
-                <span className="step-detail-label">UC mechanism</span>
-                <span className="step-detail-value">GRANT / DENY + masks + filters</span>
-              </div>
-              <div className="step-detail-item">
-                <span className="step-detail-label">Key property</span>
-                <span className="step-detail-value">Least privilege, multi-level</span>
-              </div>
-            </div>
-
-            <div className="code-block">
-              <span className="cm">-- HEALTH agent: read-only sensor access</span><br />
-              <span className="kw">GRANT</span> <span className="fn">SELECT</span>{" "}
-              <span className="kw">ON TABLE</span> sensors.bronze.telemetry<br />
-              &nbsp;&nbsp;<span className="kw">TO</span>{" "}
-              <span className="str">`agent-health-monitor`</span>;
-              <br /><br />
-              <span className="cm">-- MAINTENANCE agent: read RUL + write work orders</span><br />
-              <span className="kw">GRANT</span> <span className="fn">SELECT</span>{" "}
-              <span className="kw">ON TABLE</span> analytics.silver.rul_predictions<br />
-              &nbsp;&nbsp;<span className="kw">TO</span>{" "}
-              <span className="str">`agent-maintenance-planner`</span>;
-              <br />
-              <span className="kw">GRANT</span> <span className="fn">INSERT</span>{" "}
-              <span className="kw">ON TABLE</span> ops.gold.maintenance_orders<br />
-              &nbsp;&nbsp;<span className="kw">TO</span>{" "}
-              <span className="str">`agent-maintenance-planner`</span>;
-              <br /><br />
-              <span className="cm">-- Column masking: CREW agent can't see cost columns</span><br />
-              <span className="kw">ALTER TABLE</span> ops.gold.crew_assignments<br />
-              &nbsp;&nbsp;<span className="kw">ALTER COLUMN</span> hourly_rate{" "}
-              <span className="kw">SET MASK</span> <span className="fn">mask_cost_data</span>;
-              <br /><br />
-              <span className="cm">-- Row filter: DRILLING agent sees only active ops</span><br />
-              <span className="kw">ALTER TABLE</span> ops.gold.drilling_operations<br />
-              &nbsp;&nbsp;<span className="kw">SET ROW FILTER</span> <span className="fn">active_ops_only</span>{" "}
-              <span className="kw">ON</span> (status);
-            </div>
-
-            {/* ── Access levels breakdown ── */}
-            <h4 style={{ fontSize: 14, fontWeight: 600, marginTop: 24, marginBottom: 12 }}>Three levels of access control:</h4>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-              {[
-                { level: "Table-Level", desc: "GRANT SELECT on specific tables. The HEALTH agent sees telemetry but never crew rosters.", color: "var(--green)" },
-                { level: "Column-Level", desc: "Column masking hides sensitive fields. The CREW agent queries assignments but hourly_rate returns NULL.", color: "var(--blue)" },
-                { level: "Row-Level", desc: "Row filters restrict which rows are visible. The DRILLING agent only sees active operations, not historical.", color: "var(--purple)" },
-              ].map((l) => (
-                <div key={l.level} className="card" style={{ padding: 16 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: l.color, marginBottom: 6 }}>{l.level}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>{l.desc}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Transition ── */}
-        <div className="step-transition">
-          <span>Permissions locked in. But how do we verify agents stay within bounds?</span>
-        </div>
-
-        {/* ══ Step 3: Audit ══ */}
-        <div className="flow-step">
-          <div className="step-marker">
-            <div className="step-number">3</div>
-            <div className="step-label">Audit</div>
-          </div>
-          <div className="step-content">
-            <h3>Monitor Everything They Do</h3>
-            <p>
-              Unity Catalog <strong>system tables</strong> capture every query,
-              every data access, every grant change. When an agent acts, you know
-              exactly what data informed that decision — full lineage, full
-              traceability.
-            </p>
-
-            <div className="step-detail-grid">
-              <div className="step-detail-item">
-                <span className="step-detail-label">Human equivalent</span>
-                <span className="step-detail-value">Compliance logging, SOX audits</span>
-              </div>
-              <div className="step-detail-item">
-                <span className="step-detail-label">UC mechanism</span>
-                <span className="step-detail-value">system.access.audit + lineage</span>
-              </div>
-              <div className="step-detail-item">
-                <span className="step-detail-label">Key property</span>
-                <span className="step-detail-value">Immutable, queryable, complete</span>
-              </div>
-            </div>
-
-            <div className="code-block">
-              <span className="cm">-- What did the HEALTH agent access today?</span><br />
-              <span className="kw">SELECT</span> event_time, action_name, request_params.table_name<br />
-              <span className="kw">FROM</span> system.access.audit<br />
-              <span className="kw">WHERE</span> user_identity.service_principal ={" "}
-              <span className="str">'agent-health-monitor'</span><br />
-              &nbsp;&nbsp;<span className="kw">AND</span> event_date = current_date()<br />
-              <span className="kw">ORDER BY</span> event_time <span className="kw">DESC</span>;
-              <br /><br />
-              <span className="cm">-- Trace data lineage: what feeds the agent's decisions?</span><br />
-              <span className="kw">SELECT</span> *<br />
-              <span className="kw">FROM</span> system.access.table_lineage<br />
-              <span className="kw">WHERE</span> target_table_name = <span className="str">'recommendations'</span>;
-              <br /><br />
-              <span className="cm">-- Find denied access attempts (potential red flags)</span><br />
-              <span className="kw">SELECT</span> event_time, user_identity.service_principal, request_params<br />
-              <span className="kw">FROM</span> system.access.audit<br />
-              <span className="kw">WHERE</span> action_name = <span className="str">'denied'</span><br />
-              &nbsp;&nbsp;<span className="kw">AND</span> event_date {">"}= current_date() - <span className="fn">INTERVAL</span> 7 <span className="kw">DAYS</span>;
-            </div>
-
-            {/* ── What the audit trail reveals ── */}
-            <h4 style={{ fontSize: 14, fontWeight: 600, marginTop: 24, marginBottom: 12 }}>What you can answer with audit data:</h4>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {[
-                { q: "Which data informed this recommendation?", a: "Table lineage traces data → decision" },
-                { q: "Did any agent access data outside its role?", a: "Denied queries are logged with full context" },
-                { q: "How often does each agent query each table?", a: "Frequency analysis via system.access.audit" },
-                { q: "Has an agent's access pattern changed?", a: "Behavioral drift detection over time" },
-              ].map((item) => (
-                <div key={item.q} className="card" style={{ padding: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{item.q}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.4 }}>{item.a}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* ── Key Insight ── */}
-      <div className="card" style={{ marginTop: 48, textAlign: "center", padding: 32, borderColor: "rgba(255,54,33,0.2)" }}>
-        <div style={{ fontSize: 28, marginBottom: 12 }}>💡</div>
-        <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>The Key Insight</h3>
-        <p style={{ fontSize: 14, color: "var(--text-dim)", maxWidth: 560, margin: "0 auto", lineHeight: 1.6 }}>
-          The same governance model that protects your data from human error
-          protects it from agent error. <strong>Identity → Access → Audit</strong>{" "}
-          isn't a new framework — it's the one you already have. Unity Catalog
-          just makes it work for machines too.
-        </p>
+      {/* ── Onboarding Events Table ── */}
+      <div className="divider-section" style={{ marginTop: 48 }}>
+        <div className="divider-line" />
+        <span className="divider-label">TRACKING THE ONBOARDING</span>
+        <div className="divider-line" />
       </div>
 
-      {/* ── Next: Governance Matrix ── */}
-      <div className="callout-box" style={{ marginTop: 32 }}>
-        <div className="callout-icon">📊</div>
+      <div className="schema-card">
+        <h3>hr.agent_onboarding_events</h3>
+        <p>Every onboarding step is logged as an event — the digital orientation checklist</p>
+        <table className="schema-table">
+          <thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            {[
+              ["event_id", "STRING", "Unique event ID"],
+              ["agent_id", "STRING", "FK to agents"],
+              ["event_type", "STRING", "sp_created | grants_applied | sandbox_assigned | probation_started | probation_passed"],
+              ["event_data", "MAP<STRING,STRING>", "Event-specific metadata (grants applied, sandbox schema, etc.)"],
+              ["completed_by", "STRING", "Provisioning Job or human approver"],
+              ["event_time", "TIMESTAMP", "When event occurred"],
+            ].map(([col, type, desc]) => (
+              <tr key={col}><td className="col-name">{col}</td><td className="col-type">{type}</td><td>{desc}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Probation Deep Dive ── */}
+      <div className="divider-section" style={{ marginTop: 48 }}>
+        <div className="divider-line" />
+        <span className="divider-label">PROBATION MODE: HOW IT WORKS</span>
+        <div className="divider-line" />
+      </div>
+
+      <p className="interstitial-text" style={{ marginBottom: 24 }}>
+        During probation, the agent operates under <strong>stricter guardrails</strong>. Think of it
+        as a new hire's first 90 days — closer supervision, smaller scope, and more frequent check-ins.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+        {[
+          {
+            icon: "🔍", title: "Human-in-the-Loop",
+            text: "Every recommendation the agent generates goes to a review queue. A human approves or rejects before it takes effect. This builds trust and catches early errors.",
+          },
+          {
+            icon: "📏", title: "Smaller Data Scope",
+            text: "Sandbox data only — no production tables. The agent trains on representative samples, not live sensor feeds. Production access unlocks after probation passes.",
+          },
+          {
+            icon: "⏱️", title: "Tighter Rate Limits",
+            text: "During probation, agents are rate-limited to 100 actions/hour (vs. 10,000 in production). This prevents runaway costs and limits blast radius.",
+          },
+          {
+            icon: "📊", title: "Daily Review Cadence",
+            text: "A scheduled Job runs daily to evaluate probation agents: accuracy vs. baseline, error rate, latency. If metrics drop below thresholds, probation is extended.",
+          },
+        ].map((c) => (
+          <div key={c.title} className="card">
+            <div style={{ fontSize: 24, marginBottom: 8 }}>{c.icon}</div>
+            <h4 style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>{c.title}</h4>
+            <p style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.5 }}>{c.text}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── What triggers next stage ── */}
+      <div className="callout-box" style={{ marginTop: 32, background: "rgba(16,185,129,0.06)", borderColor: "rgba(16,185,129,0.2)" }}>
+        <div className="callout-icon">✅</div>
         <div>
-          <strong>Want to see it all at once?</strong> The Governance Matrix shows every agent's
-          permissions across every data asset in a single view — who can read what, who's
-          denied, and what happens when an agent goes out of bounds.
+          <strong>What moves the agent forward:</strong> After 30 days (or a custom probation period),
+          a scheduled evaluation Job checks: accuracy {">"} 85%, zero policy violations, and manager sign-off.
+          If all pass, the agent transitions to <strong>Training & Development</strong> with expanded access.
         </div>
       </div>
 
-      <div className="cta-row" style={{ marginTop: 24 }}>
-        <button className="btn btn-primary" onClick={() => nav("/governance")}>
-          View the Governance Matrix →
+      <div className="cta-row" style={{ marginTop: 32 }}>
+        <button className="btn btn-primary" onClick={() => nav("/training")}>
+          Next: Training & Development →
         </button>
-        <button className="btn btn-secondary" onClick={() => nav("/architecture")}>
-          See the Full Architecture
+        <button className="btn btn-secondary" onClick={() => nav("/hiring")}>
+          ← Back to Hiring
         </button>
       </div>
     </div>

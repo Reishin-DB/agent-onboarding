@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .vite/
 dist/
+
+# Environment files
+.env
+.env.local
+.env.*
